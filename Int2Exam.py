@@ -15,6 +15,7 @@ IMG_CHANNELS = 3
 BATCH_SIZE =200
 NUM_EPOCHS = 10000
 LEARNING_RATE = 0.0001
+DROPOUT_RATE = 0.4
 
 def main():
     #Loading in the data
@@ -69,16 +70,16 @@ def create_model(input_shape, num_classes):
     model.add(keras.layers.Conv2D(32, 3, activation='tanh', padding='same'))
     model.add(keras.layers.MaxPooling2D(2))
     model.add(keras.layers.Conv2D(64, 3, activation='tanh', padding='same'))
-    model.add(keras.layers.Conv2D(64, 3, activation='tanh', padding='same'))
     model.add(keras.layers.MaxPooling2D(2))
-    model.add(keras.layers.Conv2D(128, 3, activation='tanh', padding='same'))
     model.add(keras.layers.Conv2D(128, 3, activation='tanh', padding='same'))
     model.add(keras.layers.MaxPooling2D(2))
     model.add(keras.layers.Flatten())
     model.add(keras.layers.Dense(512, activation='tanh'))
-    model.add(keras.layers.Dropout(0.5))
+    model.add(keras.layers.Dropout(DROPOUT_RATE))
     model.add(keras.layers.Dense(256, activation='tanh'))
-    model.add(keras.layers.Dropout(0.5))
+    model.add(keras.layers.Dropout(DROPOUT_RATE))
+    model.add(keras.layers.Dense(128, activation='tanh'))
+    model.add(keras.layers.Dropout(DROPOUT_RATE))
     model.add(keras.layers.Dense(num_classes, activation='softmax'))
     print(model.summary())
     return model
