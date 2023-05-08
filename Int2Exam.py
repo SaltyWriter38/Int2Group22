@@ -7,22 +7,24 @@ from keras.callbacks import EarlyStopping
 from keras.optimizers import Adam
 from keras.optimizers import SGD
 from keras.utils import np_utils
+import time
 
 #Defining hyper=parameters
-IMG_WIDTH = 244
-IMG_HEIGHT = 244
+IMG_WIDTH = 122
+IMG_HEIGHT = 122
 IMG_CHANNELS = 3
-BATCH_SIZE =200
-NUM_EPOCHS = 10000
+BATCH_SIZE = 100
+NUM_EPOCHS = 2000
 LEARNING_RATE = 0.0001
-DROPOUT_RATE = 0.4
+DROPOUT_RATE = 0.2
 
 def main():
+    start_time = time.time()
     #Loading in the data
     train_data, train_labels = load_data('trnid')
     valid_data, valid_labels = load_data('valid')
     train_data, train_labels = preprocess(train_data, train_labels, augment=True)
-    valid_data, valid_labels = preprocess(valid_data, valid_labels)
+    valid_data, valid_labels = preprocess(valid_data, valid_labels, augment = False)
 
     #Convert the labels to one-hot encoding
     train_labels = np_utils.to_categorical(train_labels)
@@ -32,12 +34,15 @@ def main():
     optimizer = Adam(learning_rate= LEARNING_RATE)
     model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
 
-    # Train model
-    history = model.fit(train_data, train_labels, validation_data=(valid_data, valid_labels), epochs=NUM_EPOCHS, batch_size=BATCH_SIZE)
+    #Train model
+    history = model.fit(train_data, train_labels, validation_data=(valid_data, valid_labels), epochs=NUM_EPOCHS, batch_size=BATCH_SIZE, callbacks=[RuntimeCallback()])
 
-    # Evaluate model
+    #Evaluate model
     scores = model.evaluate(valid_data, valid_labels, verbose=0)
     print("Accuracy: %.2f%%" % (scores[1]*100))
+
+    end_time = time.time()
+    print(f"Total runtime: {end_time - start_time:.2f} seconds")
 
 def load_data(dataset):
     setid = loadmat('setid.mat')
@@ -51,13 +56,17 @@ def load_data(dataset):
 def preprocess(image_ids, labels, augment=False):
     images = []
     for i, image_id in enumerate(image_ids):
-        # Read image and convert to float
+        #WE convert the read image into a float
         image = tf.io.decode_jpeg(tf.io.read_file(f'jpg/image_{str(image_id).zfill(5)}.jpg'))
         image = tf.image.convert_image_dtype(image, tf.float32)
         image = tf.image.resize(image, [IMG_WIDTH, IMG_HEIGHT])
-        # Normalize image
+        #Using data augmentation only for the training data
+        if augment:
+            image = tf.image.random_flip_left_right(image)
+            image = tf.image.random_brightness(image, max_delta=0.1)
+            image = tf.image.random_contrast(image, lower=0.9, upper=1.1)
+        #Help to Normalize the image
         image = image / 255.0
-        # Add to list of preprocessed images and corresponding label
         images.append(image)
     return np.asarray(images), np.asarray(labels, dtype=np.float32)
 
@@ -74,13 +83,25 @@ def create_model(input_shape, num_classes):
     model.add(keras.layers.Conv2D(128, 3, activation='tanh', padding='same'))
     model.add(keras.layers.MaxPooling2D(2))
     model.add(keras.layers.Flatten())
-    model.add(keras.layers.Dense(512, activation='tanh'))
+    model.add(keras.layers.Dense(512, activation='tanh', kernel_regularizer=keras.regularizers.l2(0.01)))
     model.add(keras.layers.Dropout(DROPOUT_RATE))
-    model.add(keras.layers.Dense(256, activation='tanh'))
+    model.add(keras.layers.Dense(256, activation='tanh', kernel_regularizer=keras.regularizers.l2(0.01)))
     model.add(keras.layers.Dropout(DROPOUT_RATE))
-    model.add(keras.layers.Dense(128, activation='tanh'))
+    model.add(keras.layers.Dense(128, activation='tanh', kernel_regularizer=keras.regularizers.l2(0.01)))
     model.add(keras.layers.Dropout(DROPOUT_RATE))
     model.add(keras.layers.Dense(num_classes, activation='softmax'))
     print(model.summary())
     return model
+
+class RuntimeCallback(keras.callbacks.Callback):
+    def __init__(self):
+        super().__init__()
+        self.start_time = time.time()
+
+    def on_epoch_end(self, epoch, logs=None):
+        end_time = time.time()
+        print(f"Total runtime: {end_time - self.start_time:.2f} seconds")
+
 main()
+
+
